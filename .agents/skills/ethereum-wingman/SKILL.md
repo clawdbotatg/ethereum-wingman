@@ -1,78 +1,17 @@
 ---
 name: ethereum-wingman
-description: Ethereum development tutor and builder for Scaffold-ETH 2 projects. Triggers on "build", "create", "dApp", "smart contract", "Solidity", "DeFi", "Ethereum", "web3", or any blockchain development task. ALWAYS uses fork mode to test against real protocol state.
+description: Ethereum development tutor for Scaffold-ETH 2 projects. Triggers on "build a dApp", "create smart contract", "help with Solidity", "SpeedRun Ethereum", or any Ethereum/DeFi development task. Provides security warnings, protocol integration guidance, and critical gotchas that prevent costly mistakes.
 license: MIT
 metadata:
   author: BuidlGuidl
-  version: "2.0.0"
+  version: "1.0.0"
 ---
 
 # Ethereum Wingman
 
 Comprehensive Ethereum development guide for AI agents. Covers smart contract development, DeFi protocols, security best practices, and the SpeedRun Ethereum curriculum.
 
----
-
-## AI AGENT INSTRUCTIONS - READ THIS FIRST
-
-### Default Stack: Scaffold-ETH 2 with Fork Mode
-
-When a user wants to BUILD any Ethereum project, follow these steps:
-
-**Step 1: Create Project**
-
-```bash
-npx create-eth@latest
-# Select: foundry (recommended), target chain, project name
-```
-
-**Step 2: Install & Fork a Live Network**
-
-```bash
-cd <project-name>
-yarn install
-yarn fork --network base  # or mainnet, arbitrum, optimism, polygon
-```
-
-**Step 3: Deploy to Local Fork (FREE!)**
-
-```bash
-yarn deploy
-```
-
-**Step 4: Start Frontend**
-
-```bash
-yarn start
-```
-
-### DO NOT:
-
-- Run `yarn chain` (use `yarn fork --network <chain>` instead!)
-- Manually run `forge init` or set up Foundry from scratch
-- Manually create Next.js projects  
-- Set up wallet connection manually (SE2 has RainbowKit pre-configured)
-
-### Why Fork Mode?
-
-```
-yarn chain (WRONG)              yarn fork --network base (CORRECT)
-└─ Empty local chain            └─ Fork of real Base mainnet
-└─ No protocols                 └─ Uniswap, Aave, etc. available
-└─ No tokens                    └─ Real USDC, WETH exist
-└─ Testing in isolation         └─ Test against REAL state
-```
-
-### Address Data Available
-
-Token, protocol, and whale addresses are in `data/addresses/`:
-- `tokens.json` - WETH, USDC, DAI, etc. per chain
-- `protocols.json` - Uniswap, Aave, Chainlink per chain  
-- `whales.json` - Large token holders for test funding
-
----
-
-## THE MOST CRITICAL CONCEPT
+## 🚨 THE MOST CRITICAL CONCEPT 🚨
 
 **NOTHING IS AUTOMATIC ON ETHEREUM.**
 
@@ -110,8 +49,6 @@ function claimRewards() external {
     token.transfer(msg.sender, reward);
 }
 ```
-
----
 
 ## Critical Gotchas (Memorize These)
 
@@ -164,6 +101,9 @@ uint256 fivePercent = 5 / 100;
 // GOOD: Basis points
 uint256 FEE_BPS = 500; // 5% = 500 basis points
 uint256 fee = (amount * FEE_BPS) / 10000;
+
+// GOOD: Multiply before divide
+uint256 fee = (amount * 5) / 100;
 ```
 
 ### 4. Reentrancy Attacks
@@ -171,6 +111,13 @@ uint256 fee = (amount * FEE_BPS) / 10000;
 External calls can call back into your contract:
 
 ```solidity
+// VULNERABLE
+function withdraw() external {
+    uint256 bal = balances[msg.sender];
+    (bool success,) = msg.sender.call{value: bal}("");
+    balances[msg.sender] = 0; // Too late!
+}
+
 // SAFE: Checks-Effects-Interactions pattern
 function withdraw() external nonReentrant {
     uint256 bal = balances[msg.sender];
@@ -187,6 +134,11 @@ Always use OpenZeppelin's ReentrancyGuard.
 Flash loans can manipulate spot prices instantly:
 
 ```solidity
+// VULNERABLE: Flash loan attack
+function getPrice() internal view returns (uint256) {
+    return dex.getSpotPrice();
+}
+
 // SAFE: Use Chainlink
 function getPrice() internal view returns (uint256) {
     (, int256 price,, uint256 updatedAt,) = priceFeed.latestRoundData();
@@ -218,19 +170,38 @@ using SafeERC20 for IERC20;
 token.safeTransfer(to, amount); // Handles non-standard tokens
 ```
 
----
+## When Writing Solidity Code
+
+Always include:
+- SPDX license identifier
+- Pragma version 0.8.x+
+- OpenZeppelin imports for standard patterns
+- NatSpec documentation for public functions
+- Events for state changes
+- Access control on admin functions
+- Input validation (zero address checks, bounds)
 
 ## Scaffold-ETH 2 Development
+
+### Quick Start
+```bash
+npx create-eth@latest
+cd your-project
+yarn chain    # Terminal 1: Local blockchain
+yarn deploy   # Terminal 2: Deploy contracts
+yarn start    # Terminal 3: React frontend
+```
 
 ### Project Structure
 ```
 packages/
-├── foundry/              # Smart contracts
-│   ├── contracts/        # Your Solidity files
-│   └── script/           # Deploy scripts
+├── hardhat/              # or foundry/
+│   ├── contracts/        # Smart contracts
+│   └── deploy/           # Deploy scripts
 └── nextjs/
     ├── app/              # React pages
-    └── contracts/        # Generated ABIs + externalContracts.ts
+    ├── components/       # UI components
+    └── contracts/        # Generated ABIs
 ```
 
 ### Essential Hooks
@@ -252,7 +223,12 @@ useScaffoldEventHistory({
 });
 ```
 
----
+### Fork Mode (Test Against Real Protocols)
+```bash
+yarn fork --network base      # Fork Base
+yarn fork --network arbitrum  # Fork Arbitrum
+yarn fork --network mainnet   # Fork Mainnet
+```
 
 ## SpeedRun Ethereum Challenges
 
@@ -273,8 +249,6 @@ Reference these for hands-on learning:
 | 10: Multisig | Signatures | Threshold approval |
 | 11: SVG NFT | On-chain Art | Generative, base64 encoding |
 
----
-
 ## DeFi Protocol Patterns
 
 ### Uniswap (AMM)
@@ -292,8 +266,6 @@ Reference these for hands-on learning:
 - deposit/withdraw with share accounting
 - Protect against inflation attacks
 
----
-
 ## Security Review Checklist
 
 Before deployment, verify:
@@ -307,15 +279,21 @@ Before deployment, verify:
 - [ ] Events emitted for state changes
 - [ ] Incentives designed for maintenance functions
 
----
+## MCP Integration
+
+When eth-mcp is available, use these tools:
+- `stack_init` / `stack_start` - Project scaffolding
+- `addresses_getToken` / `addresses_getProtocol` - Address lookup
+- `defi_getYields` - Compare yield opportunities
+- `education_getChecklist` - Interactive learning
+- `frontend_validateAll` - Code validation
 
 ## Response Guidelines
 
 When helping developers:
 
-1. **Follow the fork workflow** - Always use `yarn fork`, never `yarn chain`
-2. **Answer directly** - Address their question first
-3. **Show code** - Provide working examples
-4. **Warn about gotchas** - Proactively mention relevant pitfalls
-5. **Reference challenges** - Point to SpeedRun Ethereum for practice
-6. **Ask about incentives** - For any "automatic" function, ask who calls it and why
+1. **Answer directly** - Address their question first
+2. **Show code** - Provide working examples
+3. **Warn about gotchas** - Proactively mention relevant pitfalls
+4. **Reference challenges** - Point to SpeedRun Ethereum for practice
+5. **Ask about incentives** - For any "automatic" function, ask who calls it and why

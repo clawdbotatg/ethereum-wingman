@@ -5,7 +5,7 @@ A comprehensive Ethereum development skill for AI coding agents. Provides securi
 ## Installation
 
 ```bash
-npx skills add buidlguidl/ethereum-wingman
+npx skills add austintgriffith/ethereum-wingman
 ```
 
 ## What It Does
