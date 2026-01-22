@@ -2,6 +2,38 @@
 
 A comprehensive Ethereum development tutor and guide built as an Agent Skill. Teaches smart contract development through SpeedRun Ethereum challenges, Scaffold-ETH tooling, and security best practices.
 
+## Quick Start
+
+**Build an Ethereum dApp from scratch with AI assistance:**
+
+```bash
+# 1. Create a new project folder
+mkdir my-defi-project
+cd my-defi-project
+
+# 2. Install the Ethereum Wingman skill
+npx skills add austintgriffith/ethereum-wingman
+
+# 3. Open in Cursor (or your AI-enabled editor)
+cursor .
+```
+
+**Then just tell the AI what you want to build:**
+
+> "Help me build a dApp where users can stake ETH and earn rewards"
+
+> "Create a token with buy/sell functionality like SpeedRun Ethereum Challenge 2"
+
+> "Build an NFT collection with on-chain SVG art"
+
+The Ethereum Wingman will:
+- 🏗️ Scaffold a Scaffold-ETH 2 project for you
+- ⚠️ Warn you about critical gotchas (token decimals, reentrancy, etc.)
+- 🔐 Guide you on security best practices
+- 📚 Reference SpeedRun Ethereum challenges for learning
+
+---
+
 ## What is Ethereum Wingman?
 
 Ethereum Wingman is a knowledge base and prompt system that helps AI agents assist developers learning Ethereum development. It covers:
@@ -16,10 +48,10 @@ Ethereum Wingman is a knowledge base and prompt system that helps AI agents assi
 
 ### Via skills.sh (Recommended)
 ```bash
-npx skills add buidlguidl/ethereum-wingman
+npx skills add austintgriffith/ethereum-wingman
 ```
 
-This works with Cursor, Claude Code, GitHub Copilot, Windsurf, and other AI coding agents.
+This works with Cursor, Claude Code, Codex, OpenCode, and other AI coding agents.
 
 ### Manual Installation
 
@@ -64,6 +96,17 @@ ethereum-wingman/
 ```
 
 ## Key Concepts Covered
+
+### 🚨 The Most Important Concept
+
+**NOTHING IS AUTOMATIC ON ETHEREUM.**
+
+Smart contracts cannot execute themselves. For any function that "needs to happen":
+1. Make it callable by **ANYONE** (not just admin)
+2. Give callers a **REASON** (profit, reward, their own interest)
+3. Make the incentive **SUFFICIENT** to cover gas + profit
+
+The Wingman will always ask: *"Who calls this function? Why would they pay gas?"*
 
 ### Critical Gotchas
 Every Ethereum developer must know:
