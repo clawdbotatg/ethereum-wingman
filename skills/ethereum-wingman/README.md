@@ -4,23 +4,23 @@ A comprehensive Ethereum development skill for AI coding agents. Provides securi
 
 ## Installation
 
+### For Cursor Users
+
+**Important:** Open your project in Cursor **first**, then run the install command.
+
 ```bash
+# 1. Open your project folder in Cursor
+# 2. Then run in the terminal:
 npx skills add austintgriffith/ethereum-wingman
 ```
 
-### ⚠️ REQUIRED: Extra Step for Cursor Users
+> **Why this order?** Cursor indexes skills when the project opens. Installing before Cursor is open may not be detected until you reload.
 
-**Cursor doesn't support the Agent Skills spec yet!** It ignores `.cursor/skills/` and only reads `.cursorrules`.
-
-After installing the skill, run this command in your project:
+### For Other Agents (Claude Code, Codex, etc.)
 
 ```bash
-ln -sf .agents/skills/ethereum-wingman/AGENTS.md .cursorrules
+npx skills add austintgriffith/ethereum-wingman
 ```
-
-This creates a symlink so your `.cursorrules` stays updated when the skill updates.
-
-> **Why is this needed?** The `skills.sh` installer puts skills in `.cursor/skills/` but Cursor doesn't scan that directory. This is a known gap in the ecosystem - Cursor hasn't implemented the [Agent Skills spec](https://agentskills.io/integrate-skills) yet.
 
 ## What It Does
 
