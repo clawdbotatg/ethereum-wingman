@@ -8,6 +8,20 @@ A comprehensive Ethereum development skill for AI coding agents. Provides securi
 npx skills add austintgriffith/ethereum-wingman
 ```
 
+### ⚠️ Extra Step for Cursor Users
+
+Cursor doesn't read from `.cursor/skills/` - it only reads `.cursorrules` at the project root. After installing, run:
+
+```bash
+cp .agents/skills/ethereum-wingman/AGENTS.md .cursorrules
+```
+
+Or create a symlink (updates automatically when skill updates):
+
+```bash
+ln -sf .agents/skills/ethereum-wingman/AGENTS.md .cursorrules
+```
+
 ## What It Does
 
 This skill enhances AI agents with deep knowledge of:
