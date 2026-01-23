@@ -35,6 +35,35 @@ yarn deploy
 yarn start
 ```
 
+### Step 5: Test the Frontend
+
+After the frontend is running, open a browser and test the app:
+
+1. **Navigate** to `http://localhost:3000`
+2. **Take a snapshot** to get page elements
+3. **Click the faucet** to fund the burner wallet with ETH
+4. **Transfer tokens** from whales if needed (get burner address from page)
+5. **Click through the app** to verify functionality works
+
+Use the `cursor-browser-extension` MCP tools:
+- `browser_navigate` - Open the app URL
+- `browser_snapshot` - Get element refs for clicking
+- `browser_click` - Click buttons (faucet, buy, stake, etc.)
+- `browser_type` - Enter values into input fields
+- `browser_wait_for` - Wait for transaction confirmation
+
+**Example: Fund burner with tokens**
+```bash
+# Get burner address from browser snapshot, then:
+cast rpc anvil_setBalance 0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb 0x56BC75E2D63100000
+cast rpc anvil_impersonateAccount 0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb
+cast send 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 \
+  "transfer(address,uint256)" <BURNER_ADDRESS> 10000000000 \
+  --from 0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb --unlocked
+```
+
+See `tools/testing/frontend-testing.md` for detailed testing workflows.
+
 ### DO NOT:
 
 - Run `yarn chain` (use `yarn fork --network <chain>` instead!)
@@ -54,6 +83,28 @@ yarn chain (WRONG)              yarn fork --network base (CORRECT)
 └─ Testing in isolation         └─ Test against REAL state
 └─ Can't integrate DeFi         └─ Full DeFi composability
 ```
+
+---
+
+## Auto Block Mining (Prevent Timestamp Drift)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ WARNING: When you fork a chain, block timestamps are FROZEN     │
+│ at the fork point. New blocks only mine when transactions       │
+│ happen. This breaks time-dependent logic (deadlines, vesting,   │
+│ staking periods, oracle staleness checks).                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Solution**: After starting the fork, enable auto block mining:
+
+```bash
+# Enable interval mining (1 block per second)
+cast rpc anvil_setIntervalMining 1
+```
+
+This keeps `block.timestamp` advancing in real-time, preventing weird timing bugs.
 
 ---
 
@@ -253,5 +304,6 @@ yarn verify --network base   # Verify contract
 3. **Architecture**: Suggest contract structure
 4. **Code**: Provide starting contract code
 5. **Security**: Note relevant gotchas
-6. **Next Steps**: What to implement next
-7. **Reference**: Link to relevant challenge/pattern
+6. **Test Frontend**: Open browser, fund burner, click through app
+7. **Next Steps**: What to implement next
+8. **Reference**: Link to relevant challenge/pattern

@@ -202,6 +202,19 @@ yarn fork --network optimism
 yarn fork --network arbitrum
 ```
 
+### Auto Block Mining (Prevent Timestamp Drift)
+
+When you fork a chain, block timestamps are FROZEN at the fork point. New blocks only mine when transactions happen, breaking time-dependent logic (deadlines, vesting, oracle staleness checks).
+
+**Solution**: After starting the fork, enable interval mining:
+
+```bash
+# Enable auto block mining (1 block/second)
+cast rpc anvil_setIntervalMining 1
+```
+
+This keeps `block.timestamp` advancing in real-time.
+
 ### Deploy to Testnet
 ```bash
 # Set environment variables

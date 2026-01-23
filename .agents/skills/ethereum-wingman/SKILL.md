@@ -230,6 +230,17 @@ yarn fork --network arbitrum  # Fork Arbitrum
 yarn fork --network mainnet   # Fork Mainnet
 ```
 
+### Auto Block Mining (Prevent Timestamp Drift)
+
+When you fork a chain, block timestamps are FROZEN at the fork point. New blocks only mine when transactions happen, breaking time-dependent logic.
+
+**Solution**: After starting the fork, enable interval mining:
+
+```bash
+# Enable auto block mining (1 block/second)
+cast rpc anvil_setIntervalMining 1
+```
+
 ## SpeedRun Ethereum Challenges
 
 Reference these for hands-on learning:

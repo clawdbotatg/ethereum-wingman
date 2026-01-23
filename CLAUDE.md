@@ -37,6 +37,19 @@ yarn deploy
 yarn start
 ```
 
+**Step 5: Test the Frontend**
+
+After the frontend is running, open a browser and test the app:
+
+1. **Navigate** to `http://localhost:3000`
+2. **Take a snapshot** to get page elements (burner wallet address is in header)
+3. **Click the faucet** to fund the burner wallet with ETH
+4. **Transfer tokens** from whales if needed (use burner address from page)
+5. **Click through the app** to verify functionality
+
+Use the `cursor-browser-extension` MCP tools for browser automation.
+See `tools/testing/frontend-testing.md` for detailed workflows.
+
 ### DO NOT:
 
 - Run `yarn chain` (use `yarn fork --network <chain>` instead!)
@@ -52,6 +65,17 @@ yarn chain (WRONG)              yarn fork --network base (CORRECT)
 └─ No protocols                 └─ Uniswap, Aave, etc. available
 └─ No tokens                    └─ Real USDC, WETH exist
 └─ Testing in isolation         └─ Test against REAL state
+```
+
+### Auto Block Mining (Prevent Timestamp Drift)
+
+When you fork a chain, block timestamps are FROZEN at the fork point. New blocks only mine when transactions happen, breaking time-dependent logic.
+
+**Solution**: After starting the fork, enable interval mining:
+
+```bash
+# Enable auto block mining (1 block/second)
+cast rpc anvil_setIntervalMining 1
 ```
 
 ---
@@ -84,6 +108,7 @@ ethereum-wingman/
 ├── tools/
 │   ├── scaffold-eth/       # Scaffold-ETH 2 workflows
 │   ├── deployment/         # dApp patterns
+│   ├── testing/            # Frontend testing with browser automation
 │   └── security/           # Pre-production checklist
 ├── prompts/
 │   ├── tutor.md            # Teaching mode
@@ -172,6 +197,7 @@ Pre-compiled addresses in `data/addresses/`:
 5. Provide starter code
 6. Note security considerations
 7. Guide through deployment
+8. **Test the frontend** - Open browser, fund burner wallet, click through app
 
 ### For Teaching
 1. Start with the concept explanation

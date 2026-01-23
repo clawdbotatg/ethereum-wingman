@@ -37,6 +37,25 @@ yarn deploy
 yarn start
 ```
 
+**Step 5: Test the Frontend**
+
+After the frontend is running, open a browser and test the app:
+
+1. **Navigate** to `http://localhost:3000`
+2. **Take a snapshot** to get page elements (burner address is in header)
+3. **Click the faucet** to fund the burner wallet with ETH
+4. **Transfer tokens** from whales if needed (use burner address from page)
+5. **Click through the app** to verify functionality
+
+Use the `cursor-browser-extension` MCP tools:
+- `browser_navigate` - Open the app URL
+- `browser_snapshot` - Get element refs for clicking
+- `browser_click` - Click buttons (faucet, buy, stake, etc.)
+- `browser_type` - Enter values into inputs
+- `browser_wait_for` - Wait for transactions
+
+See `tools/testing/frontend-testing.md` for detailed workflows.
+
 ### DO NOT:
 
 - Run `yarn chain` (use `yarn fork --network <chain>` instead - gives you real protocol state!)
@@ -53,6 +72,17 @@ yarn chain (WRONG)              yarn fork --network base (CORRECT)
 └─ No protocols                 └─ Uniswap, Aave, etc. available
 └─ No tokens                    └─ Real USDC, WETH exist
 └─ Testing in isolation         └─ Test against REAL state
+```
+
+### Auto Block Mining (Prevent Timestamp Drift)
+
+When you fork a chain, block timestamps are FROZEN at the fork point. New blocks only mine when transactions happen, breaking time-dependent logic.
+
+**Solution**: After starting the fork, enable interval mining:
+
+```bash
+# Enable auto block mining (1 block/second)
+cast rpc anvil_setIntervalMining 1
 ```
 
 ### Address Data
@@ -191,6 +221,7 @@ When reviewing code, check:
 - Reference specific challenges or documentation
 - Suggest practical next steps
 - **Always use the fork workflow, never `yarn chain`**
+- **After deploying, test the frontend**: Open browser, fund burner wallet, click through app
 
 ---
 

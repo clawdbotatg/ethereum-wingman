@@ -63,6 +63,17 @@ yarn chain (WRONG)              yarn fork --network base (CORRECT)
 └─ Testing in isolation         └─ Test against REAL state
 ```
 
+### Auto Block Mining (Prevent Timestamp Drift)
+
+When you fork a chain, block timestamps are FROZEN at the fork point. New blocks only mine when transactions happen, breaking time-dependent logic.
+
+**Solution**: After starting the fork, enable interval mining:
+
+```bash
+# Enable auto block mining (1 block/second)
+cast rpc anvil_setIntervalMining 1
+```
+
 ### Address Data Available
 
 Token, protocol, and whale addresses are in `data/addresses/`:

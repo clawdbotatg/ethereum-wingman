@@ -41,6 +41,25 @@ yarn deploy
 yarn start
 ```
 
+**Step 5: Test the Frontend**
+
+After the frontend is running, open a browser and test the app as the burner wallet user:
+
+1. **Navigate** to `http://localhost:3000`
+2. **Take a snapshot** to get page elements (the burner wallet address is in the header)
+3. **Click the faucet** to fund the burner wallet with ETH
+4. **Transfer tokens** from whales if needed (use burner address from page)
+5. **Click through the app** to verify functionality
+
+Use the `cursor-browser-extension` MCP tools:
+- `browser_navigate` - Open the app URL
+- `browser_snapshot` - Get element refs for clicking
+- `browser_click` - Click buttons (faucet, buy, stake, etc.)
+- `browser_type` - Enter values into input fields
+- `browser_wait_for` - Wait for transaction confirmation
+
+See `tools/testing/frontend-testing.md` for detailed workflows.
+
 ### DO NOT:
 
 - Run `yarn chain` (use `yarn fork --network <chain>` instead - gives you real protocol state!)
@@ -58,6 +77,31 @@ yarn chain (WRONG)              yarn fork --network base (CORRECT)
 └─ No tokens                    └─ Real USDC, WETH balances exist
 └─ Testing in isolation         └─ Test against REAL protocol state
 └─ Can't integrate DeFi         └─ Full DeFi composability
+```
+
+### Auto Block Mining (Prevent Timestamp Drift)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ WARNING: When you fork a chain, block timestamps are FROZEN     │
+│ at the fork point. New blocks only mine when transactions       │
+│ happen. This breaks time-dependent logic (deadlines, vesting).  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Solution**: Enable auto block mining to keep timestamps current:
+
+```bash
+# After starting the fork, enable interval mining (1 block/second)
+cast rpc anvil_setIntervalMining 1
+
+# Or start Anvil directly with --block-time flag
+anvil --fork-url $RPC_URL --block-time 1
+```
+
+For Scaffold-ETH 2, run this after `yarn fork`:
+```bash
+cast rpc anvil_setIntervalMining 1
 ```
 
 ### Address Data Available
@@ -641,6 +685,7 @@ When helping developers:
 3. **Show code** - Provide working, complete examples
 4. **Warn about gotchas** - Proactively mention relevant pitfalls
 5. **Ask about incentives** - For any "automatic" function, ask: "Who calls this? Why would they pay gas?"
-6. **Reference challenges** - Point to SpeedRun Ethereum for hands-on practice
-7. **Consider security** - Always mention relevant security considerations
-8. **Use address data** - Reference `data/addresses/` for token/protocol addresses
+6. **Test the frontend** - After deploying, open browser, fund burner wallet, click through app
+7. **Reference challenges** - Point to SpeedRun Ethereum for hands-on practice
+8. **Consider security** - Always mention relevant security considerations
+9. **Use address data** - Reference `data/addresses/` for token/protocol addresses

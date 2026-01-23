@@ -35,14 +35,78 @@ yarn fork --network polygon
 
 ### With Anvil (Foundry)
 ```bash
-# Basic fork
-anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
+# Basic fork with auto block mining (recommended)
+anvil --fork-url https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY --block-time 1
 
 # Fork at specific block
-anvil --fork-url $RPC_URL --fork-block-number 18500000
+anvil --fork-url $RPC_URL --fork-block-number 18500000 --block-time 1
 
 # With custom chain ID (for local testing)
-anvil --fork-url $RPC_URL --chain-id 31337
+anvil --fork-url $RPC_URL --chain-id 31337 --block-time 1
+```
+
+## Auto Block Mining (Prevent Timestamp Drift)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ WARNING: TIMESTAMP DRIFT ON FORKS                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│ When you fork a chain, block timestamps are FROZEN at the       │
+│ fork point. New blocks only mine when transactions happen.      │
+│                                                                 │
+│ This breaks time-dependent logic:                               │
+│ • Staking deadlines                                             │
+│ • Vesting schedules                                             │
+│ • Auction end times                                             │
+│ • Oracle staleness checks                                       │
+│ • Any block.timestamp comparison                                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Solution: Use --block-time flag
+
+The `--block-time` flag tells Anvil to automatically mine blocks at a regular interval, keeping timestamps current:
+
+```bash
+# Mine a block every second (recommended for forks)
+anvil --fork-url $RPC_URL --block-time 1
+
+# Mine every 12 seconds (mimics Ethereum mainnet)
+anvil --fork-url $RPC_URL --block-time 12
+```
+
+### Enable at Runtime
+
+If you already have a fork running, enable interval mining via RPC:
+
+```bash
+# Enable mining every 1 second
+cast rpc anvil_setIntervalMining 1
+
+# Disable interval mining (back to transaction-based)
+cast rpc anvil_setIntervalMining 0
+```
+
+### Scaffold-ETH 2 Configuration
+
+To add `--block-time` to your SE2 project, edit `packages/foundry/package.json`:
+
+```json
+{
+  "scripts": {
+    "fork": "anvil --fork-url ... --block-time 1"
+  }
+}
+```
+
+Or run the RPC command after starting the fork:
+
+```bash
+yarn fork --network base
+# In another terminal:
+cast rpc anvil_setIntervalMining 1
 ```
 
 ### With Hardhat
@@ -257,7 +321,7 @@ Providers with archive:
 ### Cache Fork Data
 ```bash
 # Anvil caches automatically, but you can specify
-anvil --fork-url $RPC --fork-block-number 18500000
+anvil --fork-url $RPC --fork-block-number 18500000 --block-time 1
 # Creates .anvil_cache/
 
 # Hardhat
