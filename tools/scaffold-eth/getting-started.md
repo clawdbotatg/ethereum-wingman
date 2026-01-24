@@ -268,11 +268,23 @@ import { defineConfig } from "@scaffold-eth/config";
 
 export default defineConfig({
   targetNetworks: [chains.hardhat],
-  pollingInterval: 30000,
+  pollingInterval: 3000,  // How often to poll RPC for fresh data (ms)
   alchemyApiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY,
   walletConnectProjectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID,
   onlyLocalBurnerWallet: true, // Disable in production!
 });
+```
+
+### Fix the Polling Interval!
+
+**IMPORTANT**: The default `pollingInterval` is 30000ms (30 seconds) - way too slow for development! Always change it to 3000ms (3 seconds) so your frontend updates quickly after transactions.
+
+```typescript
+// BAD (default): Wait 30 seconds for UI to update
+pollingInterval: 30000,
+
+// GOOD: UI updates every 3 seconds
+pollingInterval: 3000,
 ```
 
 ## Extending Scaffold-ETH

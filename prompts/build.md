@@ -23,19 +23,30 @@ yarn install
 yarn fork --network base  # or mainnet, arbitrum, optimism, polygon
 ```
 
-### Step 3: Deploy to Local Fork (FREE!)
+### Step 3: Enable Auto Block Mining (REQUIRED!)
+
+```bash
+# In a new terminal, enable interval mining (1 block/second)
+cast rpc anvil_setIntervalMining 1
+```
+
+Without this, `block.timestamp` stays FROZEN and time-dependent logic breaks!
+
+**Optional: Make it permanent** by editing `packages/foundry/package.json` to add `--block-time 1` to the fork script.
+
+### Step 4: Deploy to Local Fork (FREE!)
 
 ```bash
 yarn deploy
 ```
 
-### Step 4: Start Frontend
+### Step 5: Start Frontend
 
 ```bash
 yarn start
 ```
 
-### Step 5: Test the Frontend
+### Step 6: Test the Frontend
 
 After the frontend is running, open a browser and test the app:
 
@@ -86,25 +97,14 @@ yarn chain (WRONG)              yarn fork --network base (CORRECT)
 
 ---
 
-## Auto Block Mining (Prevent Timestamp Drift)
+## Auto Block Mining (Covered in Step 3)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ WARNING: When you fork a chain, block timestamps are FROZEN     │
-│ at the fork point. New blocks only mine when transactions       │
-│ happen. This breaks time-dependent logic (deadlines, vesting,   │
-│ staking periods, oracle staleness checks).                      │
-└─────────────────────────────────────────────────────────────────┘
-```
+Step 3 above is REQUIRED. Without interval mining, `block.timestamp` stays frozen at the fork point, breaking time-dependent logic (deadlines, vesting, staking periods, oracle staleness checks).
 
-**Solution**: After starting the fork, enable auto block mining:
-
+Alternative: Start Anvil directly with `--block-time` flag:
 ```bash
-# Enable interval mining (1 block per second)
-cast rpc anvil_setIntervalMining 1
+anvil --fork-url $RPC_URL --block-time 1
 ```
-
-This keeps `block.timestamp` advancing in real-time, preventing weird timing bugs.
 
 ---
 

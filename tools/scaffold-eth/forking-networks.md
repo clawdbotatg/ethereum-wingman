@@ -21,16 +21,18 @@ Forking creates a local copy of a live blockchain's state at a specific block. Y
 
 ## Starting a Fork
 
+**IMPORTANT: After starting a fork, you MUST enable interval mining!** See "Auto Block Mining" section below. Without it, `block.timestamp` stays frozen and time-dependent logic breaks.
+
 ### With Scaffold-ETH 2
 ```bash
-# Fork mainnet
-yarn fork
-
 # Fork specific network
 yarn fork --network base
 yarn fork --network optimism
 yarn fork --network arbitrum
 yarn fork --network polygon
+
+# THEN in a new terminal, enable interval mining (REQUIRED!)
+cast rpc anvil_setIntervalMining 1
 ```
 
 ### With Anvil (Foundry)
@@ -89,9 +91,19 @@ cast rpc anvil_setIntervalMining 1
 cast rpc anvil_setIntervalMining 0
 ```
 
-### Scaffold-ETH 2 Configuration
+### Scaffold-ETH 2 Configuration (REQUIRED!)
 
-To add `--block-time` to your SE2 project, edit `packages/foundry/package.json`:
+For Scaffold-ETH 2 projects, you MUST enable interval mining after starting the fork:
+
+```bash
+# Step 1: Start the fork
+yarn fork --network base
+
+# Step 2: In a NEW terminal, enable interval mining (REQUIRED!)
+cast rpc anvil_setIntervalMining 1
+```
+
+**Optional: Make it permanent** by editing `packages/foundry/package.json` to add `--block-time 1` to the fork script:
 
 ```json
 {
@@ -99,14 +111,6 @@ To add `--block-time` to your SE2 project, edit `packages/foundry/package.json`:
     "fork": "anvil --fork-url ... --block-time 1"
   }
 }
-```
-
-Or run the RPC command after starting the fork:
-
-```bash
-yarn fork --network base
-# In another terminal:
-cast rpc anvil_setIntervalMining 1
 ```
 
 ### With Hardhat
