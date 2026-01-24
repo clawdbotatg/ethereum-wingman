@@ -75,6 +75,8 @@ cast send 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 \
 
 See `tools/testing/frontend-testing.md` for detailed testing workflows.
 
+**Speed Note**: This is a fullstack app - browser testing is the primary test method. On a local fork, transactions confirm instantly. With `pollingInterval: 3000`, the UI updates within 3 seconds. Don't wait 20-30 seconds between clicks - each action takes just a few seconds total.
+
 ### DO NOT:
 
 - Run `yarn chain` (use `yarn fork --network <chain>` instead!)

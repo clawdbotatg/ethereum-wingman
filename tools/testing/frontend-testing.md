@@ -2,6 +2,10 @@
 
 After deploying contracts and starting the frontend, use the `cursor-browser-extension` MCP to automatically test your dApp by opening a browser, funding the burner wallet, and interacting with the UI.
 
+> **THIS IS THE PRIMARY TEST METHOD**: Scaffold-ETH 2 is a fullstack app. The best way to test is through the browser - you verify both the smart contract AND the frontend work together. Don't just run contract tests in isolation.
+
+> **IT'S FAST**: On a local fork, transactions confirm INSTANTLY. Don't wait 20-30 seconds between clicks - that's mainnet thinking! With `pollingInterval: 3000` (which you should set in `scaffold.config.ts`), the UI updates within 3 seconds. Click a button, wait 3 seconds max, see the result. The whole test flow takes seconds, not minutes.
+
 ---
 
 ## Quick Start
