@@ -2,13 +2,141 @@
 
 This file provides comprehensive guidance to AI coding agents (Claude Code, Cursor, Copilot, etc.) when working on Ethereum smart contract development.
 
-**Version**: 1.0.0  
+**Version**: 2.0.0  
 **Author**: BuidlGuidl  
 **Last Updated**: January 2026
 
 ---
 
-## 🚨 THE MOST CRITICAL CONCEPT IN ETHEREUM DEVELOPMENT 🚨
+## AI AGENT INSTRUCTIONS - READ THIS FIRST
+
+### Default Stack: Scaffold-ETH 2 with Fork Mode
+
+When a user wants to BUILD any Ethereum project, follow these steps:
+
+**Step 1: Create Project**
+
+```bash
+npx create-eth@latest
+# Select: foundry (recommended), target chain, project name
+```
+
+**Step 2: Fix Polling Interval**
+
+Edit `packages/nextjs/scaffold.config.ts` and change:
+```typescript
+pollingInterval: 30000,  // Default: 30 seconds (way too slow!)
+```
+to:
+```typescript
+pollingInterval: 3000,   // 3 seconds (much better for development)
+```
+
+**Step 3: Install & Fork a Live Network**
+
+```bash
+cd <project-name>
+yarn install
+yarn fork --network base  # or mainnet, arbitrum, optimism, polygon
+```
+
+**Step 4: Enable Auto Block Mining (REQUIRED!)**
+
+```bash
+# In a new terminal, enable interval mining (1 block/second)
+cast rpc anvil_setIntervalMining 1
+```
+
+Without this, `block.timestamp` stays FROZEN at the fork point and time-dependent logic breaks (deadlines, vesting, staking periods, oracle staleness checks).
+
+**Optional: Make it permanent** by editing `packages/foundry/package.json` to add `--block-time 1` to the fork script.
+
+**Step 5: Deploy to Local Fork (FREE!)**
+
+```bash
+yarn deploy
+```
+
+**Step 6: Start Frontend**
+
+```bash
+yarn start
+```
+
+**Step 7: Test the Frontend**
+
+After the frontend is running, open a browser and test the app as the burner wallet user:
+
+1. **Navigate** to `http://localhost:3000`
+2. **Take a snapshot** to get page elements (the burner wallet address is in the header)
+3. **Click the faucet** to fund the burner wallet with ETH
+4. **Transfer tokens** from whales if needed (use burner address from page)
+5. **Click through the app** to verify functionality
+
+Use the `cursor-browser-extension` MCP tools:
+- `browser_navigate` - Open the app URL
+- `browser_snapshot` - Get element refs for clicking
+- `browser_click` - Click buttons (faucet, buy, stake, etc.)
+- `browser_type` - Enter values into input fields
+- `browser_wait_for` - Wait for transaction confirmation
+
+See `tools/testing/frontend-testing.md` for detailed workflows.
+
+**Speed Note**: This is a fullstack app - browser testing is the primary test method. On a local fork, transactions confirm instantly. With `pollingInterval: 3000`, the UI updates within 3 seconds. Don't wait 20-30 seconds between clicks - each action takes just a few seconds total.
+
+### DO NOT:
+
+- Run `yarn chain` (use `yarn fork --network <chain>` instead - gives you real protocol state!)
+- Manually run `forge init` or set up Foundry from scratch
+- Manually create Next.js projects  
+- Set up wallet connection manually (SE2 has RainbowKit pre-configured)
+- Create custom deploy scripts (use SE2's deploy system)
+
+### Why Fork Mode?
+
+```
+yarn chain (WRONG)              yarn fork --network base (CORRECT)
+└─ Empty local chain            └─ Fork of real Base mainnet
+└─ No protocols                 └─ Uniswap, Aave, etc. all available
+└─ No tokens                    └─ Real USDC, WETH balances exist
+└─ Testing in isolation         └─ Test against REAL protocol state
+└─ Can't integrate DeFi         └─ Full DeFi composability
+```
+
+### Auto Block Mining (Covered in Step 4)
+
+Step 4 above is REQUIRED. Without interval mining, `block.timestamp` stays frozen at the fork point.
+
+Alternative: Start Anvil directly with `--block-time` flag:
+```bash
+anvil --fork-url $RPC_URL --block-time 1
+```
+
+### Address Data Available
+
+Token, protocol, and whale addresses are in `data/addresses/`:
+- `tokens.json` - WETH, USDC, DAI, etc. per chain
+- `protocols.json` - Uniswap, Aave, Chainlink, etc. per chain
+- `whales.json` - Addresses with large token balances for testing
+
+### Funding Test Wallets on Fork
+
+```bash
+# Give whale ETH for gas
+cast rpc anvil_setBalance 0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb 0x56BC75E2D63100000
+
+# Impersonate Morpho Blue (USDC whale on Base)
+cast rpc anvil_impersonateAccount 0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb
+
+# Transfer 10,000 USDC (6 decimals)
+cast send 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 \
+  "transfer(address,uint256)" YOUR_ADDRESS 10000000000 \
+  --from 0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb --unlocked
+```
+
+---
+
+## THE MOST CRITICAL CONCEPT IN ETHEREUM DEVELOPMENT
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -35,6 +163,7 @@ This file provides comprehensive guidance to AI coding agents (Claude Code, Curs
 ### Incentive Design Patterns
 
 **Pattern 1: Natural User Interest**
+
 ```solidity
 // Users WANT to claim their rewards
 function claimRewards() external {
@@ -43,10 +172,11 @@ function claimRewards() external {
     pendingRewards[msg.sender] = 0;
     rewardToken.transfer(msg.sender, reward);
 }
-// ✅ Will be called: Yes, users want their money
+// Will be called: Yes, users want their money
 ```
 
 **Pattern 2: Caller Rewards (Keeper Incentives)**
+
 ```solidity
 // LIQUIDATION: Caller gets bonus for liquidating unhealthy positions
 function liquidate(address user) external {
@@ -63,10 +193,11 @@ function liquidate(address user) external {
     userDebt[user] = 0;
     userCollateral[user] = 0;
 }
-// ✅ Incentive: Liquidator profits from the bonus
+// Incentive: Liquidator profits from the bonus
 ```
 
 **Pattern 3: Yield Harvesting**
+
 ```solidity
 // Caller gets a cut for triggering harvest
 function harvest() external {
@@ -75,25 +206,25 @@ function harvest() external {
     rewardToken.transfer(msg.sender, callerReward);
     rewardToken.transfer(address(vault), yield - callerReward);
 }
-// ✅ Incentive: Caller gets 1% of harvested yield
+// Incentive: Caller gets 1% of harvested yield
 ```
 
 ### Anti-Patterns to Avoid
 
 ```solidity
-// ❌ BAD: This will NEVER run automatically!
+// BAD: This will NEVER run automatically!
 function dailyDistribution() external {
     require(block.timestamp >= lastDistribution + 1 days);
     // This sits here forever if no one calls it
 }
 
-// ❌ BAD: Why would anyone pay gas?
+// BAD: Why would anyone pay gas?
 function updateGlobalState() external {
     globalCounter++;
     // Nobody will call this. Gas costs money.
 }
 
-// ❌ BAD: Single point of failure
+// BAD: Single point of failure
 function processExpiredPositions() external onlyOwner {
     // What if admin goes offline? Protocol stops working!
 }
@@ -216,11 +347,11 @@ First depositor can manipulate share price to steal from later depositors:
 
 ```solidity
 // ATTACK:
-// 1. Deposit 1 wei → get 1 share
+// 1. Deposit 1 wei -> get 1 share
 // 2. Donate 10000 tokens directly
 // 3. Share price = 10001 / 1 = 10001 per share
-// 4. Victim deposits 9999 → gets 0 shares
-// 5. Attacker redeems 1 share → gets all 20000 tokens
+// 4. Victim deposits 9999 -> gets 0 shares
+// 5. Attacker redeems 1 share -> gets all 20000 tokens
 
 // Mitigation: Virtual offset
 function convertToShares(uint256 assets) public view returns (uint256) {
@@ -319,28 +450,22 @@ require(msg.sender == owner);
 
 ## Scaffold-ETH 2 Development
 
-### Quick Start
-```bash
-npx create-eth@latest
-cd your-project
-yarn chain    # Terminal 1: Local blockchain
-yarn deploy   # Terminal 2: Deploy contracts
-yarn start    # Terminal 3: React frontend
-```
-
 ### Project Structure
+
 ```
 packages/
-├── hardhat/              # or foundry/
-│   ├── contracts/        # Smart contracts
-│   └── deploy/           # Deploy scripts
+├── foundry/              # Smart contracts (recommended)
+│   ├── contracts/        # Your Solidity files
+│   ├── script/           # Deploy scripts
+│   └── test/             # Forge tests
 └── nextjs/
     ├── app/              # React pages
     ├── components/       # UI components
-    └── contracts/        # Generated ABIs
+    └── contracts/        # Generated ABIs + externalContracts.ts
 ```
 
 ### Essential Hooks
+
 ```typescript
 import { useScaffoldReadContract, useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
@@ -368,22 +493,29 @@ useScaffoldEventHistory({
 const { data: contractInfo } = useDeployedContractInfo("YourContract");
 ```
 
-### Fork Mode
-```bash
-yarn fork --network base      # Fork Base
-yarn fork --network arbitrum  # Fork Arbitrum
-yarn fork --network mainnet   # Fork Mainnet
-```
+### Adding External Contracts
 
-### Auto Block Mining (Prevent Timestamp Drift)
+Edit `packages/nextjs/contracts/externalContracts.ts`:
 
-When you fork a chain, block timestamps are FROZEN at the fork point. New blocks only mine when transactions happen, breaking time-dependent logic (deadlines, vesting, oracle staleness checks).
+```typescript
+import { GenericContractsDeclaration } from "~~/utils/scaffold-eth/contract";
 
-**Solution**: After starting the fork, enable interval mining:
+const externalContracts = {
+  31337: {  // Local fork chainId
+    USDC: {
+      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      abi: [...],  // ERC20 ABI
+    },
+  },
+  8453: {  // Base mainnet (for production)
+    USDC: {
+      address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      abi: [...],
+    },
+  },
+} as const satisfies GenericContractsDeclaration;
 
-```bash
-# Enable auto block mining (1 block/second)
-cast rpc anvil_setIntervalMining 1
+export default externalContracts;
 ```
 
 ---
@@ -391,6 +523,7 @@ cast rpc anvil_setIntervalMining 1
 ## DeFi Protocol Integration
 
 ### Uniswap V3 Swapping
+
 ```solidity
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 
@@ -413,6 +546,7 @@ function swapExactInput(uint256 amountIn) external returns (uint256) {
 ```
 
 ### Aave V3 Supply and Borrow
+
 ```solidity
 import "@aave/v3-core/contracts/interfaces/IPool.sol";
 
@@ -430,6 +564,7 @@ require(healthFactor > 1.1e18, "Too risky");
 ```
 
 ### Chainlink Price Feed
+
 ```solidity
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
@@ -549,42 +684,16 @@ contract MyProtocol is ReentrancyGuard, Ownable {
 
 ---
 
-## MCP Integration (eth-mcp)
-
-When eth-mcp is available, use these tools:
-
-### Project Management
-- `stack_init` - Create new Scaffold-ETH project
-- `stack_install` - Install dependencies
-- `stack_start(["fork", "deploy", "frontend"])` - Start components
-
-### Address Lookup
-- `addresses_getToken("base", "USDC")` - Get token address
-- `addresses_getProtocol("base", "aaveV3")` - Get protocol addresses
-- `addresses_getWhale("base", "USDC")` - Get whale for testing
-
-### DeFi Data
-- `defi_getYields({ chain: "base", asset: "USDC" })` - Query yields
-- `defi_compareYields({ chain: "base", asset: "ETH" })` - Compare opportunities
-
-### Education
-- `education_getChecklist("tokens")` - Get learning checklist
-- `education_getCriticalLessons()` - Get must-know gotchas
-
-### Validation
-- `frontend_validateAll()` - Check for common mistakes
-- `frontend_lintDesign()` - Check UI guidelines
-
----
-
 ## Response Guidelines for AI Agents
 
 When helping developers:
 
-1. **Answer directly** - Address their question first
-2. **Show code** - Provide working, complete examples
-3. **Warn about gotchas** - Proactively mention relevant pitfalls
-4. **Ask about incentives** - For any "automatic" function, ask: "Who calls this? Why would they pay gas?"
-5. **Reference challenges** - Point to SpeedRun Ethereum for hands-on practice
-6. **Consider security** - Always mention relevant security considerations
-7. **Suggest next steps** - Guide them to the next logical action
+1. **Follow the fork workflow** - Always use `yarn fork --network <chain>`, never `yarn chain`
+2. **Answer directly** - Address their question first
+3. **Show code** - Provide working, complete examples
+4. **Warn about gotchas** - Proactively mention relevant pitfalls
+5. **Ask about incentives** - For any "automatic" function, ask: "Who calls this? Why would they pay gas?"
+6. **Test the frontend** - After deploying, open browser, fund burner wallet, click through app
+7. **Reference challenges** - Point to SpeedRun Ethereum for hands-on practice
+8. **Consider security** - Always mention relevant security considerations
+9. **Use address data** - Reference `data/addresses/` for token/protocol addresses

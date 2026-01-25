@@ -26,7 +26,18 @@ npx create-eth@latest
 # Select: foundry (recommended), target chain, project name
 ```
 
-**Step 2: Install & Fork a Live Network**
+**Step 2: Fix Polling Interval**
+
+Edit `packages/nextjs/scaffold.config.ts` and change:
+```typescript
+pollingInterval: 30000,  // Default: 30 seconds (way too slow!)
+```
+to:
+```typescript
+pollingInterval: 3000,   // 3 seconds (much better for development)
+```
+
+**Step 3: Install & Fork a Live Network**
 
 ```bash
 cd <project-name>
@@ -34,17 +45,41 @@ yarn install
 yarn fork --network base  # or mainnet, arbitrum, optimism, polygon
 ```
 
-**Step 3: Deploy to Local Fork (FREE!)**
+**Step 4: Enable Auto Block Mining (REQUIRED!)**
+
+```bash
+# In a new terminal, enable interval mining (1 block/second)
+cast rpc anvil_setIntervalMining 1
+```
+
+Without this, `block.timestamp` stays FROZEN and time-dependent logic breaks!
+
+**Optional: Make it permanent** by editing `packages/foundry/package.json` to add `--block-time 1` to the fork script.
+
+**Step 5: Deploy to Local Fork (FREE!)**
 
 ```bash
 yarn deploy
 ```
 
-**Step 4: Start Frontend**
+**Step 6: Start Frontend**
 
 ```bash
 yarn start
 ```
+
+**Step 7: Test the Frontend**
+
+After the frontend is running, open a browser and test the app:
+
+1. **Navigate** to `http://localhost:3000`
+2. **Take a snapshot** to get page elements (burner wallet address is in header)
+3. **Click the faucet** to fund the burner wallet with ETH
+4. **Transfer tokens** from whales if needed (use burner address from page)
+5. **Click through the app** to verify functionality
+
+Use the `cursor-browser-extension` MCP tools for browser automation.
+See `tools/testing/frontend-testing.md` for detailed workflows.
 
 ### DO NOT:
 
@@ -61,17 +96,6 @@ yarn chain (WRONG)              yarn fork --network base (CORRECT)
 └─ No protocols                 └─ Uniswap, Aave, etc. available
 └─ No tokens                    └─ Real USDC, WETH exist
 └─ Testing in isolation         └─ Test against REAL state
-```
-
-### Auto Block Mining (Prevent Timestamp Drift)
-
-When you fork a chain, block timestamps are FROZEN at the fork point. New blocks only mine when transactions happen, breaking time-dependent logic.
-
-**Solution**: After starting the fork, enable interval mining:
-
-```bash
-# Enable auto block mining (1 block/second)
-cast rpc anvil_setIntervalMining 1
 ```
 
 ### Address Data Available
