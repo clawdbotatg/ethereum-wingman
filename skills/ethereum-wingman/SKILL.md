@@ -27,6 +27,151 @@ Comprehensive Ethereum development guide for AI agents. Covers smart contract de
 
 ---
 
+## 🚨 FRONTEND UX RULES (MANDATORY)
+
+**These are hard rules, not suggestions. A build is NOT done until all are satisfied.**
+
+### Rule 1: Every Onchain Button — Loader + Disable
+
+ANY button triggering a blockchain transaction MUST disable on click, show a loader, and stay disabled until state confirms completion. **Each button gets its own loading state — NEVER share a single `isLoading` across multiple buttons.**
+
+```typescript
+// ✅ CORRECT: Separate loading state per action
+const [isApproving, setIsApproving] = useState(false);
+const [isStaking, setIsStaking] = useState(false);
+
+<button disabled={isApproving} onClick={async () => {
+  setIsApproving(true);
+  try { await writeContractAsync({ functionName: "approve", args: [...] }); }
+  catch (e) { notification.error("Approval failed"); }
+  finally { setIsApproving(false); }
+}}>
+  {isApproving ? "Approving..." : "Approve"}
+</button>
+
+// ❌ WRONG: Shared state causes wrong text on wrong button when UI switches
+const [isLoading, setIsLoading] = useState(false);
+```
+
+### Rule 2: Three-Button Flow — Network → Approve → Action
+
+For approve-then-action patterns, show exactly ONE button based on state:
+
+```
+Wrong network?       → "Switch to Base"
+Not enough approved? → "Approve"
+Approved enough?     → "Stake" / "Deposit" / action
+```
+
+Always read allowance via a hook (auto-updates on tx confirm). If user clicks approve on the wrong network, everything breaks — network check FIRST.
+
+```typescript
+const { data: allowance } = useScaffoldReadContract({
+  contractName: "Token", functionName: "allowance",
+  args: [address, contractAddress],
+});
+const needsApproval = !allowance || allowance < amount;
+const wrongNetwork = chain?.id !== targetChainId;
+
+{wrongNetwork ? (
+  <button onClick={switchNetwork}>Switch to Base</button>
+) : needsApproval ? (
+  <button disabled={isApproving} onClick={handleApprove}>
+    {isApproving ? "Approving..." : "Approve"}
+  </button>
+) : (
+  <button disabled={isStaking} onClick={handleStake}>
+    {isStaking ? "Staking..." : "Stake"}
+  </button>
+)}
+```
+
+### Rule 3: Address Display — Always `<Address/>`
+
+**Every** Ethereum address displayed must use scaffold-eth's `<Address/>` component. Never render raw hex. It handles ENS, blockies, copy, truncation, and explorer links.
+
+```typescript
+import { Address } from "~~/components/scaffold-eth";
+<Address address={userAddress} />  // ✅
+<span>{userAddress}</span>         // ❌ Never
+```
+
+### Rule 4: RPC Configuration — Never Public RPCs
+
+Public RPCs (`mainnet.base.org`, etc.) rate-limit aggressively. Always configure reliable RPCs:
+
+```typescript
+// scaffold.config.ts
+rpcOverrides: {
+  [chains.base.id]: "https://base-mainnet.g.alchemy.com/v2/YOUR_KEY",
+},
+pollingInterval: 3000,
+```
+
+**Monitor polling:** ~1 request/3 seconds is correct. 15+ requests/second means a bug (hook re-rendering in a loop, duplicate hooks, unnecessary `watch: true`).
+
+### Rule 5: Pre-Publish Checklist
+
+Before deploying frontend to production, verify:
+
+- [ ] **OG/Twitter meta** in `app/layout.tsx` with **absolute live URL** for images (not localhost, not relative, not an unset env var)
+- [ ] **Twitter card**: `summary_large_image`
+- [ ] **Page title** is correct (not "Scaffold-ETH 2")
+- [ ] **Favicon** updated from SE2 default
+- [ ] **Footer** "Fork me" link → your actual repo
+- [ ] **README** describes your project
+- [ ] **RPC overrides** configured (not public RPCs)
+- [ ] **No localhost/testnet values** hardcoded in production code
+- [ ] **All addresses** use `<Address/>`
+- [ ] **All onchain buttons** have loader + disabled states
+
+See `tools/testing/frontend-qa-checklist.md` for the full protocol.
+
+---
+
+## 🔄 THREE-PHASE BUILD PROCESS
+
+Bugs should be caught in the cheapest phase. Don't jump to production.
+
+### Phase 1: Localhost Frontend + Local Chain + Burner Wallets
+**Cost:** Free. **Speed:** Instant. **What to test:** Logic, UI rendering, user flows.
+
+Superpowers: impersonate accounts, fast-forward time, faucet, whale tokens, instant blocks.
+
+**Exit criteria before Phase 2:**
+- [ ] App loads, all pages render, no console errors
+- [ ] Every button does something (no dead UI)
+- [ ] Full user flow works end-to-end
+- [ ] Contract tests pass (`forge test`)
+- [ ] Edge cases tested (zero, max, unauthorized)
+
+### Phase 2: Localhost Frontend + Live L2 + Browser Wallet (MetaMask)
+**Cost:** Real gas. **Speed:** 2-3 second tx times. **What to test:** Wallet UX, loaders, network switching, RPC stability.
+
+This is where loading states, double-click prevention, approve flows, and RPC issues surface.
+
+**Exit criteria before Phase 3:**
+- [ ] Wallet connects via MetaMask
+- [ ] Wrong network → "Switch" button works
+- [ ] Every onchain button has its OWN loader + disables on click
+- [ ] Approve → action flow works (three-button pattern)
+- [ ] Rejecting tx in wallet → UI recovers gracefully
+- [ ] RPC polling is sensible (check Network tab)
+- [ ] Real transaction works end-to-end
+
+### Phase 3: Live Frontend (Vercel/IPFS) + Live Chain + Browser Wallets
+**Cost:** Highest — broken deploys waste builds, confuse users. **Speed:** Slowest loop.
+
+**Exit criteria before sharing publicly:**
+- [ ] All Phase 2 criteria pass on live URL
+- [ ] OG unfurl works (paste URL in Twitter/Telegram)
+- [ ] No localhost/testnet artifacts in production
+- [ ] Works in incognito window
+
+See `tools/testing/frontend-qa-checklist.md` for detailed browser test protocols per phase.
+
+---
+
 ### Default Stack: Scaffold-ETH 2 with Fork Mode
 
 When a user wants to BUILD any Ethereum project, follow these steps:

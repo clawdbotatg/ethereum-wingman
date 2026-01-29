@@ -136,6 +136,57 @@ cast send 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 \
 
 ---
 
+## 🚨 FRONTEND UX RULES (MANDATORY)
+
+These are hard rules. A build is NOT done until all are satisfied.
+
+### Rule 1: Every Onchain Button — Loader + Disable
+ANY button triggering a blockchain tx MUST disable on click and show a loader. **Each button gets its own loading state** — NEVER share a single `isLoading` across multiple buttons (causes wrong text on wrong button when UI switches).
+
+```typescript
+const [isApproving, setIsApproving] = useState(false);
+<button disabled={isApproving} onClick={async () => {
+  setIsApproving(true);
+  try { await writeContractAsync({ functionName: "approve", args: [...] }); }
+  catch (e) { notification.error("Failed"); }
+  finally { setIsApproving(false); }
+}}>
+  {isApproving ? "Approving..." : "Approve"}
+</button>
+```
+
+### Rule 2: Three-Button Flow — Network → Approve → Action
+For approve-then-action patterns, show exactly ONE button: wrong network → "Switch to Base" | not enough approved → "Approve" | approved → "Stake/Deposit". Always read allowance via a hook (auto-updates). Network check comes FIRST — approve on wrong network breaks everything.
+
+### Rule 3: Address Display — Always `<Address/>`
+Every Ethereum address must use scaffold-eth's `<Address/>` component. Never render raw hex.
+
+### Rule 4: RPC — Never Public RPCs
+Always configure `rpcOverrides` in `scaffold.config.ts` with reliable RPCs (Alchemy, Infura, etc.). Public RPCs (`mainnet.base.org`) rate-limit. Monitor polling: ~1 req/3sec is correct, 15+/sec means a bug.
+
+### Rule 5: Pre-Publish Checklist
+Before deploying to production: OG/Twitter meta with **absolute live URL** for images (not localhost/relative/env var), correct page title, updated favicon, footer link to your repo, README updated, no hardcoded localhost/testnet values.
+
+See `tools/testing/frontend-qa-checklist.md` for full browser test protocols.
+
+---
+
+## 🔄 THREE-PHASE BUILD PROCESS
+
+Bugs should be caught in the cheapest phase. Don't jump to production.
+
+**Phase 1: Localhost + Local Chain + Burner Wallet** — Free, instant. Test logic, rendering, flows. Exit: all pages render, all buttons work, forge test passes, no console errors.
+
+**Phase 2: Localhost + Live L2 + MetaMask** — Real gas, 2-3sec tx times. Test wallet UX: loaders, double-click prevention, approve flow, network switching, RPC stability. Exit: every button has its own loader, approve flow works, reject recovers gracefully.
+
+**Phase 3: Live Frontend + Live Chain** — Highest cost, slowest loop. Test unfurls, no localhost artifacts, production env. Exit: OG unfurl works, all Phase 2 criteria pass on live URL.
+
+**Golden rule:** Every bug found in Phase 3 means Phase 1 or 2 testing failed.
+
+See `tools/testing/frontend-qa-checklist.md` for detailed exit criteria and browser test protocols per phase.
+
+---
+
 ## THE MOST CRITICAL CONCEPT IN ETHEREUM DEVELOPMENT
 
 ```
