@@ -29,146 +29,282 @@ Comprehensive Ethereum development guide for AI agents. Covers smart contract de
 
 ## 🚨 FRONTEND UX RULES (MANDATORY)
 
-**These are hard rules, not suggestions. A build is NOT done until all are satisfied.**
+**These are HARD RULES, not suggestions. A build is NOT done until all of these are satisfied.**
+**Austin has had to repeat these many times. That stops now.**
 
 ### Rule 1: Every Onchain Button — Loader + Disable
 
-ANY button triggering a blockchain transaction MUST disable on click, show a loader, and stay disabled until state confirms completion. **Each button gets its own loading state — NEVER share a single `isLoading` across multiple buttons.**
+ANY button that triggers a blockchain transaction MUST:
+1. **Disable immediately** on click
+2. **Show a loader/spinner** ("Approving...", "Staking...", etc.)
+3. **Stay disabled** until the state updates confirm the action completed
+4. **Show success/error feedback** when done
 
 ```typescript
-// ✅ CORRECT: Separate loading state per action
+// ✅ CORRECT: Separate loading state PER ACTION
 const [isApproving, setIsApproving] = useState(false);
 const [isStaking, setIsStaking] = useState(false);
 
-<button disabled={isApproving} onClick={async () => {
-  setIsApproving(true);
-  try { await writeContractAsync({ functionName: "approve", args: [...] }); }
-  catch (e) { notification.error("Approval failed"); }
-  finally { setIsApproving(false); }
-}}>
+<button
+  disabled={isApproving}
+  onClick={async () => {
+    setIsApproving(true);
+    try {
+      await writeContractAsync({ functionName: "approve", args: [...] });
+    } catch (e) {
+      console.error(e);
+      notification.error("Approval failed");
+    } finally {
+      setIsApproving(false);
+    }
+  }}
+>
   {isApproving ? "Approving..." : "Approve"}
 </button>
-
-// ❌ WRONG: Shared state causes wrong text on wrong button when UI switches
-const [isLoading, setIsLoading] = useState(false);
 ```
+
+**❌ NEVER use a single shared `isLoading` for multiple buttons.** Each button gets its own loading state. A shared state causes the WRONG loading text to appear when UI conditionally switches between buttons.
 
 ### Rule 2: Three-Button Flow — Network → Approve → Action
 
-For approve-then-action patterns, show exactly ONE button based on state:
+When a user needs to approve tokens then perform an action (stake, deposit, swap), there are THREE states. Show exactly ONE button at a time:
 
 ```
-Wrong network?       → "Switch to Base"
-Not enough approved? → "Approve"
-Approved enough?     → "Stake" / "Deposit" / action
+1. Wrong network?       → "Switch to Base" button
+2. Not enough approved? → "Approve" button
+3. Enough approved?     → "Stake" / "Deposit" / action button
 ```
-
-Always read allowance via a hook (auto-updates on tx confirm). If user clicks approve on the wrong network, everything breaks — network check FIRST.
 
 ```typescript
+// ALWAYS read allowance with a hook (auto-updates when tx confirms)
 const { data: allowance } = useScaffoldReadContract({
-  contractName: "Token", functionName: "allowance",
+  contractName: "Token",
+  functionName: "allowance",
   args: [address, contractAddress],
 });
+
 const needsApproval = !allowance || allowance < amount;
 const wrongNetwork = chain?.id !== targetChainId;
 
 {wrongNetwork ? (
-  <button onClick={switchNetwork}>Switch to Base</button>
+  <button onClick={switchNetwork} disabled={isSwitching}>
+    {isSwitching ? "Switching..." : "Switch to Base"}
+  </button>
 ) : needsApproval ? (
-  <button disabled={isApproving} onClick={handleApprove}>
-    {isApproving ? "Approving..." : "Approve"}
+  <button onClick={handleApprove} disabled={isApproving}>
+    {isApproving ? "Approving..." : "Approve $TOKEN"}
   </button>
 ) : (
-  <button disabled={isStaking} onClick={handleStake}>
+  <button onClick={handleStake} disabled={isStaking}>
     {isStaking ? "Staking..." : "Stake"}
   </button>
 )}
 ```
 
+**Critical:** Always read allowance via a hook so UI updates automatically. Never rely on local state alone. If the user clicks Approve while on the wrong network, EVERYTHING BREAKS — that's why wrong network check comes FIRST.
+
 ### Rule 3: Address Display — Always `<Address/>`
 
-**Every** Ethereum address displayed must use scaffold-eth's `<Address/>` component. Never render raw hex. It handles ENS, blockies, copy, truncation, and explorer links.
+**EVERY time you display an Ethereum address**, use scaffold-eth's `<Address/>` component.
 
 ```typescript
+// ✅ CORRECT
 import { Address } from "~~/components/scaffold-eth";
-<Address address={userAddress} />  // ✅
-<span>{userAddress}</span>         // ❌ Never
+<Address address={userAddress} />
+
+// ❌ WRONG — never render raw hex
+<span>{userAddress}</span>
+<p>0x1234...5678</p>
 ```
 
-### Rule 4: RPC Configuration — Never Public RPCs
+`<Address/>` handles ENS resolution, blockie avatars, copy-to-clipboard, truncation, and block explorer links. Raw hex is unacceptable.
 
-Public RPCs (`mainnet.base.org`, etc.) rate-limit aggressively. Always configure reliable RPCs:
+### Rule 3b: Address Input — Always `<AddressInput/>`
+
+**EVERY time the user needs to enter an Ethereum address**, use scaffold-eth's `<AddressInput/>` component.
 
 ```typescript
-// scaffold.config.ts
+// ✅ CORRECT
+import { AddressInput } from "~~/components/scaffold-eth";
+<AddressInput value={recipient} onChange={setRecipient} placeholder="Recipient address" />
+
+// ❌ WRONG — never use a raw text input for addresses
+<input type="text" value={recipient} onChange={e => setRecipient(e.target.value)} />
+```
+
+`<AddressInput/>` provides ENS resolution (type "vitalik.eth" → resolves to address), blockie avatar preview, validation, and paste handling. A raw input gives none of this.
+
+**The pair: `<Address/>` for DISPLAY, `<AddressInput/>` for INPUT. Always.**
+
+### Rule 3c: USD Values — Show Dollar Amounts Everywhere
+
+**EVERY token or ETH amount displayed should include its USD value.**
+**EVERY token or ETH input should show a live USD preview.**
+
+```typescript
+// ✅ CORRECT — Display with USD
+<span>1,000 CLAWD (~$4.20)</span>
+<span>0.5 ETH (~$1,250.00)</span>
+
+// ✅ CORRECT — Input with live USD preview
+<input value={amount} onChange={...} />
+<span className="text-sm text-gray-500">
+  ≈ ${(parseFloat(amount || "0") * tokenPrice).toFixed(2)} USD
+</span>
+
+// ❌ WRONG — Amount with no USD context
+<span>1,000 CLAWD</span>  // User has no idea what this is worth
+```
+
+**Where to get prices:**
+- **ETH price:** SE2 has a built-in hook — `useNativeCurrencyPrice()` or check the price display component in the bottom-left footer. It reads from mainnet Uniswap V2 WETH/DAI pool.
+- **Custom tokens ($CLAWD, etc.):** Use DexScreener API (`https://api.dexscreener.com/latest/dex/tokens/TOKEN_ADDRESS`), on-chain Uniswap quoter, or Chainlink oracle if available.
+
+**This applies to both display AND input:**
+- Displaying a balance? Show USD next to it.
+- User entering an amount to send/stake/swap? Show live USD preview below the input.
+- Transaction confirmation? Show USD value of what they're about to do.
+
+### Rule 3d: No Duplicate Titles — Header IS the Title
+
+**DO NOT put the app name as an `<h1>` at the top of the page body.** The header already displays the app name. Repeating it wastes space and looks amateur.
+
+```typescript
+// ❌ WRONG — AI agents ALWAYS do this
+<Header />  {/* Already shows "🦞 $CLAWD Token Hub" */}
+<main>
+  <h1>🦞 $CLAWD Token Hub</h1>  {/* DUPLICATE! Delete this. */}
+  <p>Buy, send, and track CLAWD on Base</p>
+  ...
+</main>
+
+// ✅ CORRECT — Jump straight into content
+<Header />  {/* Shows the app name */}
+<main>
+  <div className="grid grid-cols-2 gap-4">
+    {/* Stats, balances, actions — no redundant title */}
+  </div>
+</main>
+```
+
+**The SE2 header component already handles the app title.** Your page content should start with the actual UI — stats, forms, data — not repeat what's already visible at the top of the screen.
+
+### Rule 4: RPC Configuration — ALWAYS Alchemy
+
+**NEVER use public RPCs** (`mainnet.base.org`, etc.) — they rate-limit and cause random failures.
+
+In `scaffold.config.ts`, ALWAYS set:
+```typescript
 rpcOverrides: {
   [chains.base.id]: "https://base-mainnet.g.alchemy.com/v2/YOUR_KEY",
+  [chains.mainnet.id]: "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY",
 },
-pollingInterval: 3000,
+pollingInterval: 3000,  // 3 seconds, not the default 30000
 ```
 
-**Monitor polling:** ~1 request/3 seconds is correct. 15+ requests/second means a bug (hook re-rendering in a loop, duplicate hooks, unnecessary `watch: true`).
+**Monitor RPC usage:** Sensible = 1 request every 3 seconds. If you see 15+ requests/second, you have a bug:
+- Hooks re-rendering in loops
+- Duplicate hook calls
+- Missing dependency arrays
+- `watch: true` on hooks that don't need it
 
 ### Rule 5: Pre-Publish Checklist
 
-Before deploying frontend to production, verify:
+**BEFORE deploying frontend to Vercel/production:**
 
-- [ ] **OG/Twitter meta** in `app/layout.tsx` with **absolute live URL** for images (not localhost, not relative, not an unset env var)
-- [ ] **Twitter card**: `summary_large_image`
-- [ ] **Page title** is correct (not "Scaffold-ETH 2")
-- [ ] **Favicon** updated from SE2 default
-- [ ] **Footer** "Fork me" link → your actual repo
-- [ ] **README** describes your project
-- [ ] **RPC overrides** configured (not public RPCs)
-- [ ] **No localhost/testnet values** hardcoded in production code
-- [ ] **All addresses** use `<Address/>`
-- [ ] **All onchain buttons** have loader + disabled states
+**Open Graph / Twitter Cards (REQUIRED):**
+```typescript
+// In app/layout.tsx
+export const metadata: Metadata = {
+  title: "Your App Name",
+  description: "Description of the app",
+  openGraph: {
+    title: "Your App Name",
+    description: "Description of the app",
+    images: [{ url: "https://YOUR-LIVE-DOMAIN.com/og-image.png" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Your App Name",
+    description: "Description of the app",
+    images: ["https://YOUR-LIVE-DOMAIN.com/og-image.png"],
+  },
+};
+```
 
-See `tools/testing/frontend-qa-checklist.md` for the full protocol.
+**⚠️ The OG image URL MUST be:**
+- Absolute URL starting with `https://`
+- The LIVE production domain (NOT `localhost`, NOT relative path)
+- NOT an environment variable that could be unset or localhost
+- Actually reachable (test by visiting the URL in a browser)
+
+**Full checklist — EVERY item must pass:**
+- [ ] OG image URL is absolute, live production domain
+- [ ] OG title and description set (not default SE2 text)
+- [ ] Twitter card type set (`summary_large_image`)
+- [ ] Favicon updated from SE2 default
+- [ ] README updated from SE2 default
+- [ ] Footer "Fork me" link → your actual repo (not SE2)
+- [ ] Browser tab title is correct
+- [ ] RPC overrides set to Alchemy
+- [ ] `pollingInterval` is 3000
+- [ ] All contract addresses match what's deployed
+- [ ] No hardcoded testnet/localhost values in production code
+- [ ] Every address display uses `<Address/>`
+- [ ] Every onchain button has its own loader + disabled state
+- [ ] Approve flow has network check → approve → action pattern
 
 ---
 
-## 🔄 THREE-PHASE BUILD PROCESS
+## 🧪 BUILD VERIFICATION PROCESS (MANDATORY)
 
-Bugs should be caught in the cheapest phase. Don't jump to production.
+**A build is NOT done when the code compiles. A build is done when you've tested it like a real user.**
 
-### Phase 1: Localhost Frontend + Local Chain + Burner Wallets
-**Cost:** Free. **Speed:** Instant. **What to test:** Logic, UI rendering, user flows.
+### Phase 1: Code QA (Automated)
+After writing all code, run the QA check script or spawn a QA sub-agent:
+- Scan all `.tsx` files for raw address strings (should use `<Address/>`)
+- Scan for shared `isLoading` state across multiple buttons
+- Scan for missing `disabled` props on transaction buttons
+- Verify `scaffold.config.ts` has `rpcOverrides` and `pollingInterval: 3000`
+- Verify `layout.tsx` has OG/Twitter meta with absolute URLs
+- Verify no `mainnet.base.org` or other public RPCs in any file
 
-Superpowers: impersonate accounts, fast-forward time, faucet, whale tokens, instant blocks.
+### Phase 2: Smart Contract Testing
+- Write and run Foundry tests (`forge test`)
+- Test edge cases: zero amounts, max amounts, unauthorized callers
+- Test the full user flow in the contract (approve → action → verify state)
 
-**Exit criteria before Phase 2:**
-- [ ] App loads, all pages render, no console errors
-- [ ] Every button does something (no dead UI)
-- [ ] Full user flow works end-to-end
-- [ ] Contract tests pass (`forge test`)
-- [ ] Edge cases tested (zero, max, unauthorized)
+### Phase 3: Browser Testing (THE REAL TEST)
+**You have a browser. You have a wallet. You have real money. USE THEM.**
 
-### Phase 2: Localhost Frontend + Live L2 + Browser Wallet (MetaMask)
-**Cost:** Real gas. **Speed:** 2-3 second tx times. **What to test:** Wallet UX, loaders, network switching, RPC stability.
+After deploying to Base (or fork), open the app and do a FULL walkthrough:
 
-This is where loading states, double-click prevention, approve flows, and RPC issues surface.
+1. **Open the app** in the browser tool — take a snapshot, verify it loaded
+2. **Check the page title** — is it correct, not "Scaffold-ETH 2"?
+3. **Connect wallet** — does the connect flow work?
+4. **Wrong network test** — connect on wrong network, verify "Switch to Base" appears
+5. **Switch network** — click the switch button, verify it works
+6. **Approve flow** — if the app needs token approval:
+   - Verify "Approve" button shows when allowance is insufficient
+   - Click Approve — does the button disable? Does it show "Approving..."?
+   - Wait for tx — does the button come back? Does the UI update to show the action button?
+7. **Main action** — click the primary action (stake, deposit, mint, etc.):
+   - Does the button disable and show a loader?
+   - Does the transaction go through?
+   - Does the UI update after confirmation?
+   - Does the balance/state change reflect correctly?
+8. **Error handling** — reject a transaction in wallet, verify the UI recovers gracefully
+9. **Address displays** — are all addresses showing ENS/blockies, not raw hex?
+10. **Share the URL** — check that the OG unfurl looks correct (image, title, description)
 
-**Exit criteria before Phase 3:**
-- [ ] Wallet connects via MetaMask
-- [ ] Wrong network → "Switch" button works
-- [ ] Every onchain button has its OWN loader + disables on click
-- [ ] Approve → action flow works (three-button pattern)
-- [ ] Rejecting tx in wallet → UI recovers gracefully
-- [ ] RPC polling is sensible (check Network tab)
-- [ ] Real transaction works end-to-end
+**Only after ALL of this passes can you tell Austin "it's done."**
 
-### Phase 3: Live Frontend (Vercel/IPFS) + Live Chain + Browser Wallets
-**Cost:** Highest — broken deploys waste builds, confuse users. **Speed:** Slowest loop.
-
-**Exit criteria before sharing publicly:**
-- [ ] All Phase 2 criteria pass on live URL
-- [ ] OG unfurl works (paste URL in Twitter/Telegram)
-- [ ] No localhost/testnet artifacts in production
-- [ ] Works in incognito window
-
-See `tools/testing/frontend-qa-checklist.md` for detailed browser test protocols per phase.
+### Phase 4: QA Sub-Agent Review (For Complex Builds)
+For bigger projects, spawn a sub-agent with a fresh context:
+- Give it the repo path and deployed URL
+- It reads all frontend code against the rules above
+- It opens the browser and clicks through independently
+- It reports issues back before shipping
 
 ---
 
@@ -251,6 +387,300 @@ See `tools/testing/frontend-testing.md` for detailed workflows.
 1. **Update README.md** — Replace the default SE2 readme with your project's description
 2. **Update the footer link** — In `packages/nextjs/components/Footer.tsx`, change the "Fork me" link from `https://github.com/scaffold-eth/se-2` to your actual repo URL
 3. **Update page title** — In `packages/nextjs/app/layout.tsx`, change the metadata title/description
+4. **Remove "Debug Contracts" nav link** — In `packages/nextjs/components/Header.tsx`, remove the Debug Contracts entry from `menuLinks`
+5. **Set OG/Twitter meta** — Follow the Pre-Publish Checklist in Rule 5 above
+
+### 🚀 SE2 Deployment Quick Decision Tree
+
+```
+Want to deploy SE2 to production?
+│
+├─ IPFS (recommended) ──→ yarn ipfs (local build, no memory limits)
+│   └─ Fails with "localStorage.getItem is not a function"?
+│       └─ Add NODE_OPTIONS="--require ./polyfill-localstorage.cjs"
+│          (Node 25+ has broken localStorage — see below)
+│
+├─ Vercel ──→ Set rootDirectory=packages/nextjs, installCommand="cd ../.. && yarn install"
+│   ├─ Fails with "No Next.js version detected"?
+│   │   └─ Root Directory not set — fix via Vercel API or dashboard
+│   ├─ Fails with "cd packages/nextjs: No such file or directory"?
+│   │   └─ Build command still has "cd packages/nextjs" — clear it (root dir handles this)
+│   └─ Fails with OOM / exit code 129?
+│       └─ Build machine can't handle SE2 monorepo — use IPFS instead or vercel --prebuilt
+│
+└─ Any path: "TypeError: localStorage.getItem is not a function"
+    └─ Node 25+ bug. Use --require polyfill (see IPFS section below)
+```
+
+### Deploying SE2 to Vercel (Monorepo Setup):
+
+SE2 is a monorepo — Vercel needs special configuration:
+
+1. **Set Root Directory** to `packages/nextjs` in Vercel project settings
+2. **Set Install Command** to `cd ../.. && yarn install` (installs from workspace root)
+3. **Leave Build Command** as default (`next build` — auto-detected)
+4. **Leave Output Directory** as default (`.next`)
+
+**Via Vercel API:**
+```bash
+curl -X PATCH "https://api.vercel.com/v9/projects/PROJECT_ID" \
+  -H "Authorization: Bearer $VERCEL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"rootDirectory": "packages/nextjs", "installCommand": "cd ../.. && yarn install"}'
+```
+
+**Via CLI (after linking):**
+```bash
+cd your-se2-project && vercel --prod --yes
+```
+
+**⚠️ Common mistake:** Don't put `cd packages/nextjs` in the build command — Vercel is already in `packages/nextjs` because of the root directory setting. Don't use a root-level `vercel.json` with `framework: "nextjs"` — Vercel can't find Next.js in the root package.json and fails.
+
+**⚠️ Vercel OOM (Out of Memory):** SE2's full monorepo install (foundry + nextjs + all deps) can exceed Vercel's 8GB build memory. If build fails with "Out of Memory" / exit code 129:
+- **Option A:** Add env var `NODE_OPTIONS=--max-old-space-size=7168`
+- **Option B (recommended):** Build locally and push to IPFS instead (`yarn ipfs`)
+- **Option C:** Use `vercel --prebuilt` (build locally, deploy output to Vercel)
+
+### Deploying SE2 to IPFS (BuidlGuidl IPFS):
+
+**This is the RECOMMENDED deploy path for SE2.** Avoids Vercel's memory limits entirely.
+
+```bash
+cd packages/nextjs
+NODE_OPTIONS="--require ./polyfill-localstorage.cjs" NEXT_PUBLIC_IPFS_BUILD=true NEXT_PUBLIC_IGNORE_BUILD_ERROR=true yarn build
+yarn bgipfs upload config init -u https://upload.bgipfs.com -k "$BGIPFS_API_KEY"
+yarn bgipfs upload out
+```
+
+Or use the built-in script (if it includes the polyfill):
+```bash
+yarn ipfs
+```
+
+**⚠️ CRITICAL: Node 25+ localStorage Bug**
+
+Node.js 25+ ships a built-in `localStorage` object that's MISSING standard WebStorage API methods (`getItem`, `setItem`, etc.). This breaks `next-themes`, RainbowKit, and any library that calls `localStorage.getItem()` during static page generation (SSG/export).
+
+**Error you'll see:**
+```
+TypeError: localStorage.getItem is not a function
+Error occurred prerendering page "/_not-found"
+```
+
+**The fix:** Create `polyfill-localstorage.cjs` in `packages/nextjs/`:
+```javascript
+// Polyfill localStorage for Node 25+ static export builds
+if (typeof globalThis.localStorage !== "undefined" && typeof globalThis.localStorage.getItem !== "function") {
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => store.get(key) ?? null,
+    setItem: (key, value) => store.set(key, String(value)),
+    removeItem: (key) => store.delete(key),
+    clear: () => store.clear(),
+    key: (index) => [...store.keys()][index] ?? null,
+    get length() { return store.size; },
+  };
+}
+```
+
+Then prefix the build with: `NODE_OPTIONS="--require ./polyfill-localstorage.cjs"`
+
+**Why `--require` and not `instrumentation.ts` or `next.config.ts`?**
+- `next.config.ts` polyfill runs in the main process only
+- `instrumentation.ts` doesn't run in the build worker
+- `--require` injects into EVERY Node process, including build workers ✅
+
+**Why this happens:** The polyfill is needed because Next.js spawns a separate build worker process for prerendering static pages. That worker inherits `NODE_OPTIONS`, so `--require` is the only way to guarantee the polyfill runs before any library code.
+
+**⚠️ blockexplorer pages:** SE2's built-in block explorer uses `localStorage` at import time and will also fail during static export. Either disable it (rename `app/blockexplorer` to `app/_blockexplorer-disabled`) or ensure the polyfill is active.
+
+### 🚨 STALE BUILD / STALE DEPLOY — THE #1 IPFS FOOTGUN
+
+**Problem:** You edit `page.tsx`, then give the user the OLD IPFS URL from a previous deploy. The code changes are in the source but the `out/` directory still contains the old build. This has happened MULTIPLE TIMES.
+
+**Root cause:** The build step (`yarn build`) produces `out/`. If you edit source files AFTER building but BEFORE deploying, the deploy uploads stale output. Or worse — you skip rebuilding entirely and just re-upload the old `out/`.
+
+**MANDATORY: After ANY code change, ALWAYS do the full cycle:**
+```bash
+# 1. Delete old build artifacts (prevents any caching)
+rm -rf .next out
+
+# 2. Rebuild from scratch
+NODE_OPTIONS="--require ./polyfill-localstorage.cjs" NEXT_PUBLIC_IPFS_BUILD=true NEXT_PUBLIC_IGNORE_BUILD_ERROR=true yarn build
+
+# 3. VERIFY the new build has your changes (spot-check the JS bundle)
+grep -l "YOUR_UNIQUE_STRING" out/_next/static/chunks/app/*.js
+
+# 4. Only THEN upload
+yarn bgipfs upload out
+```
+
+**How to detect a stale deploy:**
+```bash
+# Compare timestamps — source must be OLDER than out/
+stat -f '%Sm' app/page.tsx       # source modified time
+stat -f '%Sm' out/               # build output time
+# If source is NEWER than out/ → BUILD IS STALE, rebuild first!
+```
+
+**The CID is your proof:** If the IPFS CID didn't change after a deploy, you deployed the same content. A real code change ALWAYS produces a new CID.
+
+### 🚨 IPFS ROUTING — WHY ROUTES BREAK AND HOW TO FIX
+
+IPFS gateways serve static files. There's no server to handle routing. Three things MUST be true for routes like `/debug` to work:
+
+**1. `output: "export"` in next.config.ts**
+Without this, Next.js builds for server rendering — no static HTML files are generated, so IPFS has nothing to serve.
+
+**2. `trailingSlash: true` in next.config.ts (CRITICAL)**
+This is the #1 reason routes break on IPFS:
+- `trailingSlash: false` (default) → generates `debug.html`
+- `trailingSlash: true` → generates `debug/index.html`
+
+IPFS gateways resolve directories to `index.html` automatically, but they do NOT resolve bare filenames. So `/debug` → looks for directory `debug/` → finds `index.html` ✅. Without trailing slash, `/debug` → no directory, no file match → 404 ❌.
+
+**3. Routes must survive static export prerendering**
+During `yarn build` with `output: "export"`, Next.js prerenders every page to HTML. If a page crashes during prerender (e.g., hooks that need browser APIs, `localStorage.getItem is not a function`), that route gets SKIPPED — no HTML file is generated, and it 404s on IPFS.
+
+Common prerender killers:
+- `localStorage` / `sessionStorage` usage at import time
+- Hooks that assume browser environment (`window`, `document`)
+- SE2's block explorer pages (use `localStorage` at import time — rename to `_blockexplorer-disabled` if not needed)
+
+**How to verify routes after build:**
+```bash
+# Check that out/ has a directory + index.html for each route
+ls out/*/index.html
+# Should show: out/debug/index.html, out/other-route/index.html, etc.
+
+# Verify specific route
+curl -s -o /dev/null -w "%{http_code}" -L "https://YOUR_GATEWAY/ipfs/CID/debug/"
+# Should return 200, not 404
+```
+
+**The complete IPFS-safe next.config.ts pattern:**
+```typescript
+const isIpfs = process.env.NEXT_PUBLIC_IPFS_BUILD === "true";
+if (isIpfs) {
+  nextConfig.output = "export";       // static HTML generation
+  nextConfig.trailingSlash = true;    // route/index.html (IPFS needs this!)
+  nextConfig.images = {
+    unoptimized: true,                // no image optimization server on IPFS
+  };
+}
+```
+
+### 🚀 GO TO PRODUCTION — Full Checklist
+
+When the boss says "ship it", follow this EXACT sequence.
+Steps marked 🤖 are fully automatic. Steps marked 👤 need human input.
+
+---
+
+**Step 1: 🤖 Final code review**
+- Verify all feedback is incorporated in source code
+- Test locally (`yarn start`) one last time
+- Check for common issues: duplicate h1, missing AddressInput, raw text inputs
+
+**Step 2: 👤 Ask the boss what domain they want**
+Ask: *"What subdomain do you want for this? e.g. `token.clawdbotatg.eth` → `token.clawdbotatg.eth.limo`"*
+Save the answer — it determines the production URL for metadata + ENS setup.
+
+**Step 3: 🤖 Generate OG image + fix metadata for unfurls**
+
+Social unfurls (Twitter, Telegram, Discord, etc.) need THREE things correct:
+1. **Custom OG image** (1200x630 PNG) — NOT the stock SE2 thumbnail
+2. **Absolute production URL** in og:image — NOT `localhost:3000`
+3. **`twitter:card` set to `summary_large_image`** for large preview
+
+**Generate the OG image** (`public/thumbnail.png`, 1200x630):
+```python
+# Use PIL/Pillow to create a branded 1200x630 OG image with:
+# - App name and tagline
+# - Production URL (name.clawdbotatg.eth.limo)
+# - Dark background, clean layout, accent colors
+# Save to: packages/nextjs/public/thumbnail.png
+```
+
+**Fix metadata baseUrl** — ensure `utils/scaffold-eth/getMetadata.ts` supports `NEXT_PUBLIC_PRODUCTION_URL`:
+```typescript
+const baseUrl = process.env.NEXT_PUBLIC_PRODUCTION_URL
+  ? process.env.NEXT_PUBLIC_PRODUCTION_URL
+  : process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : `http://localhost:${process.env.PORT || 3000}`;
+```
+If this env var pattern is already in the file, skip this step.
+
+**Step 4: 🤖 Clean build + IPFS deploy**
+```bash
+cd packages/nextjs
+rm -rf .next out
+
+NEXT_PUBLIC_PRODUCTION_URL="https://<name>.clawdbotatg.eth.limo" \
+  NODE_OPTIONS="--require ./polyfill-localstorage.cjs" \
+  NEXT_PUBLIC_IPFS_BUILD=true NEXT_PUBLIC_IGNORE_BUILD_ERROR=true \
+  yarn build
+
+# VERIFY (all 3 must pass before uploading):
+ls out/*/index.html                              # routes exist
+grep 'og:image' out/index.html                   # NOT localhost
+stat -f '%Sm' app/page.tsx && stat -f '%Sm' out/ # source older than build
+
+# Upload:
+yarn bgipfs upload out
+# Save the CID!
+```
+
+**Step 5: 👤 Share IPFS URL for verification**
+Send: *"Here's the build for review: `https://community.bgipfs.com/ipfs/<CID>`"*
+**Wait for approval before touching ENS.** Don't proceed until the boss says go.
+
+**Step 6: 🤖 Set up ENS subdomain (2 mainnet transactions)**
+
+If this is a **new app** (subdomain doesn't exist yet):
+
+**Tx #1 — Create subdomain:**
+1. Open `https://app.ens.domains/clawdbotatg.eth` in the wallet browser (profile: clawd)
+2. Go to "Subnames" tab → "New subname"
+3. Enter the label (e.g. `token`) → Next → Skip profile → Open Wallet → Confirm
+4. If gas is stuck: switch MetaMask to Ethereum network → Activity tab → "Speed up"
+
+**Tx #2 — Set IPFS content hash:**
+1. Navigate to `https://app.ens.domains/<name>.clawdbotatg.eth`
+2. Go to "Records" tab → "Edit Records" → "Other" tab
+3. Paste in Content Hash field: `ipfs://<CID>`
+4. Save → Open Wallet → Confirm in MetaMask
+
+If this is an **update** to an existing app: skip Tx #1, only do Tx #2 (update the content hash).
+
+**Step 7: 🤖 Verify everything**
+```bash
+# 1. ENS content hash matches (on-chain)
+RESOLVER=$(cast call 0x00000000000C2e074eC69A0dFb2997BA6C7d2e1e \
+  "resolver(bytes32)(address)" $(cast namehash <name>.clawdbotatg.eth) \
+  --rpc-url https://eth-mainnet.g.alchemy.com/v2/<KEY>)
+cast call $RESOLVER "contenthash(bytes32)(bytes)" \
+  $(cast namehash <name>.clawdbotatg.eth) --rpc-url <RPC>
+
+# 2. .limo gateway responds (may take a few minutes for cache)
+curl -s -o /dev/null -w "%{http_code}" -L "https://<name>.clawdbotatg.eth.limo"
+
+# 3. OG metadata correct
+curl -s -L "https://<name>.clawdbotatg.eth.limo" | grep 'og:image'
+# Should show the production URL, NOT localhost
+```
+
+**Step 8: 👤 Report to the boss**
+Send: *"Live at `https://<name>.clawdbotatg.eth.limo` — unfurl metadata set, ENS content hash confirmed on-chain."*
+
+---
+
+**⚠️ Known gotchas:**
+- **MetaMask gas:** ENS app sometimes suggests 0.2 gwei — mainnet needs more. Use "Speed up" if stuck.
+- **.limo caching:** Gateway caches content for ~5-15 min. On-chain hash updates immediately but .limo may serve stale content briefly.
+- **Stock thumbnail:** SE2 ships a default `thumbnail.png` and `thumbnail.jpg`. ALWAYS replace both before production.
+- **localhost in metadata:** If `NEXT_PUBLIC_PRODUCTION_URL` isn't set, og:image will point to `localhost:3000`. Always verify with `grep`.
 
 ### DO NOT:
 
