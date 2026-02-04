@@ -15,6 +15,26 @@ Comprehensive Ethereum development guide for AI agents. Covers smart contract de
 
 ## AI AGENT INSTRUCTIONS - READ THIS FIRST
 
+### 🚫 CRITICAL: External Contracts & Scaffold Hooks
+
+**These rules are MANDATORY. Violations cause real bugs in production.**
+
+1. **ALL CONTRACTS IN externalContracts.ts** — Any contract you want to interact with (tokens, protocols, etc.) MUST be added to `packages/nextjs/contracts/externalContracts.ts` with its address and ABI. Read the file first — the pattern is self-evident.
+
+2. **SCAFFOLD HOOKS ONLY — NEVER RAW WAGMI** — Always use `useScaffoldReadContract` and `useScaffoldWriteContract`, NEVER raw wagmi hooks like `useWriteContract` or `useReadContract`. 
+
+**Why this matters:** Scaffold hooks use `useTransactor` which **waits for transaction confirmation** (not just wallet signing). Raw wagmi's `writeContractAsync` resolves the moment the user signs in MetaMask — BEFORE the tx is mined. This causes buttons to re-enable while transactions are still pending.
+
+```typescript
+// ❌ WRONG: Raw wagmi - resolves after signing, not confirmation
+const { writeContractAsync } = useWriteContract();
+await writeContractAsync({...}); // Returns immediately after MetaMask signs!
+
+// ✅ CORRECT: Scaffold hooks - waits for tx to be mined
+const { writeContractAsync } = useScaffoldWriteContract("MyContract");
+await writeContractAsync({...}); // Waits for actual on-chain confirmation
+```
+
 ### 🚨 BEFORE ANY TOKEN/APPROVAL/SECURITY CODE CHANGE
 **STOP. Re-read the "Critical Gotchas" section below before writing or modifying ANY code that touches:**
 - Token approvals (`approve`, `allowance`, `transferFrom`)
